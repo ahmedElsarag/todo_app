@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class DoneTasks extends StatefulWidget {
-  const DoneTasks({Key? key}) : super(key: key);
+  const DoneTasks({Key key}) : super(key: key);
 
   @override
   State<DoneTasks> createState() => _DoneTasksState();

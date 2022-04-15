@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:todo_app/modules/archived_tasks/archived_tasks.dart';
 import 'package:todo_app/modules/done_tasks/done_tasks.dart';
 import 'package:todo_app/modules/new_tasks/new_tasks.dart';
+import 'package:todo_app/widgets/components.dart';
 
 class HomeLayout extends StatefulWidget {
-  const HomeLayout({Key? key}) : super(key: key);
+  const HomeLayout({Key key}) : super(key: key);
 
   @override
   State<HomeLayout> createState() => _HomeLayoutState();
@@ -15,11 +17,16 @@ class _HomeLayoutState extends State<HomeLayout> {
   int _currentIndex = 0;
   var list = [NewTasks(), DoneTasks(), ArchivedTasks()];
   var title = ["NewTasks", "DoneTasks", "ArchivedTasks"];
-  late Database database;
+  Database database;
+
+  var titleController = TextEditingController();
+  var timeController = TextEditingController();
+  var dateController = TextEditingController();
 
   var isBottomSheetShown = false;
 
   var scaffoldKey = GlobalKey<ScaffoldState>();
+  var formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -37,21 +44,96 @@ class _HomeLayoutState extends State<HomeLayout> {
       ),
       body: list[_currentIndex],
       floatingActionButton: FloatingActionButton(
-        child: isBottomSheetShown==true?Icon(Icons.close):Icon(Icons.edit),
+        child:
+            isBottomSheetShown == true ? Icon(Icons.close) : Icon(Icons.edit),
         onPressed: () {
-          if(isBottomSheetShown){
-            Navigator.pop(context);
-            setState(() {
-              isBottomSheetShown = false;
-            });
-          }else{
+          if (isBottomSheetShown) {
+            if (formKey.currentState.validate()) {
+              insertToDatabase(titleController.text, timeController.text,
+                  dateController.text).then((value){
+                Navigator.pop(context);
+                setState(() {
+                  isBottomSheetShown = false;
+                });
+              }).catchError((error)=> print(error.toString()));
+
+            }
+          } else {
             scaffoldKey.currentState?.showBottomSheet((context) {
               return Container(
-                width: double.infinity,
-                height: 120,
-                color: Colors.red,
-              );
-            });
+                  width: double.infinity,
+                  padding:
+                      EdgeInsets.only(top: 40, right: 20, left: 20, bottom: 20),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        defaultFormField(
+                          label: 'Title',
+                          controller: titleController,
+                          type: TextInputType.text,
+                          validate: (String value) {
+                            if (value.isEmpty) {
+                              return 'title must not be empty';
+                            }
+                            return null;
+                          },
+                          prefix: Icons.title,
+                        ),
+                        const SizedBox(
+                          height: 15,
+                        ),
+                        defaultFormField(
+                            label: 'Task time',
+                            controller: timeController,
+                            type: TextInputType.text,
+                            validate: (String value) {
+                              if (value.isEmpty) {
+                                return 'time must not be empty';
+                              }
+                              return null;
+                            },
+                            prefix: Icons.access_time,
+                            onTab: () {
+                              showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now())
+                                  .then((value) => timeController.text =
+                                      value.format(context));
+                            }),
+                        const SizedBox(
+                          height: 15,
+                        ),
+                        defaultFormField(
+                            label: 'Task date',
+                            controller: dateController,
+                            type: TextInputType.text,
+                            validate: (String value) {
+                              if (value.isEmpty) {
+                                return 'date must not be empty';
+                              }
+                              return null;
+                            },
+                            prefix: Icons.calendar_today,
+                            onTab: () {
+                              showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.parse('2025-05-01'))
+                                  .then((value) => dateController.text =
+                                      DateFormat.yMMMd().format(value));
+                            }),
+                      ],
+                    ),
+                  ));
+            },
+                elevation: 15,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20))));
             setState(() {
               isBottomSheetShown = true;
             });
@@ -102,14 +184,13 @@ class _HomeLayoutState extends State<HomeLayout> {
         .catchError((error) => print(error.toString()));
   }
 
-  void insertToDatabase() {
-    database.transaction((txn) async {
+  Future insertToDatabase(String title, String time, String date) async {
+    return await database.transaction((txn) {
       txn
           .rawInsert(
-              'INSERT INTO Tasks(title,date,time,status ) VALUES("first task","20-1-2021","15:24","new")')
-          .then((value) => print('raw inserted at id: $value'))
-          .catchError(
-              (error) => print('error inserting raw: ${error.toString()}'));
+              'INSERT INTO Tasks(title,date,time,status) VALUES("$title","$date","$time","new")')
+      .then((value) => print('$value inserted'));
+      return null;
     });
   }
 }
