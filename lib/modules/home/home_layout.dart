@@ -1,3 +1,4 @@
+import 'package:conditional_builder/conditional_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
@@ -5,6 +6,8 @@ import 'package:todo_app/modules/archived_tasks/archived_tasks.dart';
 import 'package:todo_app/modules/done_tasks/done_tasks.dart';
 import 'package:todo_app/modules/new_tasks/new_tasks.dart';
 import 'package:todo_app/widgets/components.dart';
+
+import '../../widgets/constants.dart';
 
 class HomeLayout extends StatefulWidget {
   const HomeLayout({Key key}) : super(key: key);
@@ -15,7 +18,7 @@ class HomeLayout extends StatefulWidget {
 
 class _HomeLayoutState extends State<HomeLayout> {
   int _currentIndex = 0;
-  var list = [NewTasks(), DoneTasks(), ArchivedTasks()];
+  var list = const [NewTasks(), DoneTasks(), ArchivedTasks()];
   var title = ["NewTasks", "DoneTasks", "ArchivedTasks"];
   Database database;
 
@@ -27,6 +30,7 @@ class _HomeLayoutState extends State<HomeLayout> {
 
   var scaffoldKey = GlobalKey<ScaffoldState>();
   var formKey = GlobalKey<FormState>();
+
 
   @override
   void initState() {
@@ -42,10 +46,14 @@ class _HomeLayoutState extends State<HomeLayout> {
       appBar: AppBar(
         title: Text(title[_currentIndex]),
       ),
-      body: list[_currentIndex],
+      body: ConditionalBuilder(
+        condition: tasksList.isNotEmpty,
+        builder: (context)=>list[_currentIndex],
+        fallback: (context)=>const Center(child: CircularProgressIndicator()),
+      ),
       floatingActionButton: FloatingActionButton(
         child:
-            isBottomSheetShown == true ? Icon(Icons.close) : Icon(Icons.edit),
+            isBottomSheetShown == true ? const Icon(Icons.close) : const Icon(Icons.edit),
         onPressed: () {
           if (isBottomSheetShown) {
             if (formKey.currentState.validate()) {
@@ -63,7 +71,7 @@ class _HomeLayoutState extends State<HomeLayout> {
               return Container(
                   width: double.infinity,
                   padding:
-                      EdgeInsets.only(top: 40, right: 20, left: 20, bottom: 20),
+                      const EdgeInsets.only(top: 40, right: 20, left: 20, bottom: 20),
                   child: Form(
                     key: formKey,
                     child: Column(
@@ -130,10 +138,17 @@ class _HomeLayoutState extends State<HomeLayout> {
                   ));
             },
                 elevation: 15,
-                shape: RoundedRectangleBorder(
+                shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20))));
+                        topRight: Radius.circular(20)
+                    )
+                )
+            )?.closed?.then((value){
+              setState(() {
+                isBottomSheetShown = false;
+              });
+            });
             setState(() {
               isBottomSheetShown = true;
             });
@@ -172,6 +187,12 @@ class _HomeLayoutState extends State<HomeLayout> {
         //if todo.db exist it will ignore onCreate and call onOpen
         onOpen: (database) {
       print('database opened');
+      getDataFromDatabase(database).then((value) {
+        setState(() {
+          tasksList = value;
+        });
+        print(tasksList);
+      });
     });
   }
 
@@ -189,8 +210,21 @@ class _HomeLayoutState extends State<HomeLayout> {
       txn
           .rawInsert(
               'INSERT INTO Tasks(title,date,time,status) VALUES("$title","$date","$time","new")')
-      .then((value) => print('$value inserted'));
+      .then((value) {
+        print('$value inserted');
+        getDataFromDatabase(database).then((value) {
+            tasksList = value;
+          print(tasksList);
+        });
+      });
       return null;
     });
+  }
+
+  Future<List<Map>> getDataFromDatabase(database) async{
+    /// we will pass the database object from on open method as if we use general
+    /// object we got error as general object is ready after all database process done
+
+    return await database.rawQuery('SELECT * FROM Tasks');
   }
 }
